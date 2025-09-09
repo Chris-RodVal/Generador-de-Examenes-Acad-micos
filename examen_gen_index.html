@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ExámenGen · Generador de Pruebas (MVP)</title>
+  <meta name="description" content="MVP estático para generar pruebas en PDF y DOCX con portada personalizable y solucionario." />
+  <style>
+    :root{--bg:#0b1220;--panel:#0f172a;--muted:#94a3b8;--text:#e5e7eb;--acc:#22d3ee;--ok:#22c55e;--warn:#f59e0b;--err:#ef4444}
+    html,body{height:100%;margin:0}
+    body{background:radial-gradient(1200px 600px at 50% -200px,#0f172a 0%,#0b1220 60%,#070b12 100%);
+         color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,"Helvetica Neue",Arial}
+    .wrap{max-width:1100px;margin:20px auto;padding:16px}
+    .grid{display:grid;gap:14px}
+    .two{grid-template-columns: 1fr 1fr}
+    @media (max-width:900px){.two{grid-template-columns:1fr}}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,.01));
+          border:1px solid rgba(148,163,184,.18);border-radius:16px;padding:16px;box-shadow:0 10px 24px rgba(0,0,0,.25)}
+    h1{font-size:24px;margin:0 0 8px 0;letter-spacing:.2px}
+    h2{font-size:16px;margin:12px 0 8px 0;opacity:.9}
+    label{display:block;font-size:12px;color:var(--muted);margin:10px 0 6px}
+    input,textarea,select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(148,163,184,.25);
+                          background:#0b1220;color:var(--text);outline:none}
+    input:focus,textarea:focus,select:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(34,211,238,.15)}
+    .row{display:flex;gap:10px}
+    .row>*{flex:1}
+    .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:12px;border:1px solid rgba(148,163,184,.25);
+         cursor:pointer;background:#0c1829;color:var(--text);text-decoration:none;user-select:none}
+    .btn:hover{border-color:var(--acc)}
+    .btn-primary{background:linear-gradient(180deg,#0ea5b6,#0891b2);border-color:#06b6d4}
+    .btn-ok{background:linear-gradient(180deg,#2dd280,#1fb56c);border-color:#22c55e}
+    .tag{font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid rgba(148,163,184,.25);color:var(--muted)}
+    .muted{color:var(--muted)}
+    .hero{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .logo{display:flex;align-items:center;gap:10px}
+    .logo-dot{width:12px;height:12px;border-radius:50%;background:conic-gradient(from 120deg,#22d3ee,#22c55e,#0ea5b6)}
+    .hr{height:1px;background:linear-gradient(90deg,transparent,rgba(148,163,184,.25),transparent);border:0;margin:12px 0}
+    .notice{font-size:12px;color:var(--muted)}
+    .footer{margin-top:20px;display:flex;justify-content:space-between;align-items:center}
+    .kbd{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+         font-size:12px;background:#0b1220;border:1px solid rgba(148,163,184,.28);padding:2px 6px;border-radius:6px;color:#93c5fd}
+    .pill{padding:8px 10px;border-radius:12px;background:#0b1220;border:1px dashed rgba(148,163,184,.35)}
+    .hidden{display:none}
+  </style>
+  <!-- Libs CDN (funcionan en GitHub Pages) -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.3/dist/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+</head>
+<body>
+  <div class="wrap grid">
+    <div class="card hero">
+      <div class="logo">
+        <div class="logo-dot"></div>
+        <div>
+          <h1>ExámenGen</h1>
+          <div class="muted">Generador de pruebas con portada y solucionario · <span class="tag">MVP estático</span></div>
+        </div>
+      </div>
+      <div class="pill">
+        Precio: <b>$1.000 CLP</b> <span class="muted">(demo sin pasarela)</span>
+      </div>
+    </div>
+
+    <div class="grid two">
+      <form id="examForm" class="card">
+        <h2>1) Portada y metadatos</h2>
+        <label>Institución</label>
+        <input id="institution" placeholder="Universidad de…" />
+        <div class="row">
+          <div>
+            <label>Cátedra / Asignatura</label>
+            <input id="course" placeholder="Farmacología / Historia / Matemáticas" />
+          </div>
+          <div>
+            <label>Materia (unidad/tema general)</label>
+            <input id="subject" placeholder="Sistema Nervioso / Revolución Francesa…" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Docente</label>
+            <input id="teacher" placeholder="Nombre del profesor/a" />
+          </div>
+          <div>
+            <label>Fecha</label>
+            <input id="date" type="date" />
+          </div>
+        </div>
+        <label>Título de la evaluación</label>
+        <input id="title" placeholder="Prueba Unidad 2 / Examen Parcial" />
+        <label>Instrucciones generales</label>
+        <textarea id="instructions" rows="3" placeholder="Responda con lápiz grafito, no use corrector, tiempo 60 minutos…"></textarea>
+
+        <h2>2) Temas / contenidos</h2>
+        <label>Tópicos principales (separados por coma)</label>
+        <textarea id="topics" rows="3" placeholder="farmacocinética, colinérgicos, simpaticolíticos"></textarea>
+
+        <h2>3) Configuración de preguntas</h2>
+        <div class="row">
+          <div>
+            <label>N.º de alternativas por MCQ</label>
+            <select id="mcqOptions">
+              <option value="4">4</option>
+              <option value="5">5</option>
+            </select>
+          </div>
+          <div>
+            <label>MCQ (elección múltiple)</label>
+            <input id="mcqCount" type="number" min="0" value="10" />
+          </div>
+          <div>
+            <label>V/F</label>
+            <input id="tfCount" type="number" min="0" value="5" />
+          </div>
+          <div>
+            <label>Desarrollo</label>
+            <input id="essayCount" type="number" min="0" value="2" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Semilla (reproducible)</label>
+            <input id="seed" type="number" placeholder="Opcional" />
+          </div>
+          <div>
+            <label>Espaciado</label>
+            <select id="spacing">
+              <option value="1.2">1.2</option>
+              <option value="1.4" selected>1.4</option>
+              <option value="1.6">1.6</option>
+            </select>
+          </div>
+          <div>
+            <label>Márgenes (mm)</label>
+            <input id="margins" type="number" value="15" />
+          </div>
+        </div>
+        <div class="hr"></div>
+        <div class="row">
+          <button type="button" class="btn btn-primary" id="btnSimulatePay">Pagar $1.000 (demo)</button>
+          <button type="button" class="btn" id="btnPreview">Vista previa</button>
+          <button type="button" class="btn" id="btnReset">Limpiar</button>
+        </div>
+        <div class="notice">Este MVP genera contenido didáctico basado en plantillas usando tus tópicos. En producción se puede integrar IA y pasarela (Webpay/Mercado Pago) con backend.</div>
+      </form>
+
+      <div class="card" id="panelRight">
+        <h2>Salida y descargas</h2>
+        <div id="payStatus" class="tag">Estado: no pagado</div>
+        <p class="muted">Debes <b>simular el pago</b> para habilitar las descargas en este MVP.</p>
+        <div class="row">
+          <button class="btn btn-ok hidden" id="dlExamPDF">Descargar PRUEBA (PDF)</button>
+          <button class="btn btn-ok hidden" id="dlKeyPDF">Descargar SOLUCIONARIO (PDF)</button>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn hidden" id="dlExamDOCX">Descargar PRUEBA (DOCX)</button>
+          <button class="btn hidden" id="dlKeyDOCX">Descargar SOLUCIONARIO (DOCX)</button>
+        </div>
+        <div class="hr"></div>
+        <h2>Vista previa (HTML)</h2>
+        <div id="preview" class="pill" style="max-height:420px;overflow:auto"></div>
+      </div>
+    </div>
+
+    <div class="footer muted">
+      <div>© ExámenGen · MVP estático para GitHub Pages</div>
+      <div>Atajos: <span class="kbd">Alt+G</span> Generar · <span class="kbd">Alt+P</span> Simular pago</div>
+    </div>
+  </div>
+
+<script>
+// ---------- Utilidades ----------
+function rng(seed) {
+  // LCG simple para reproducibilidad
+  let s = seed || Math.floor(Math.random()*1e9);
+  return function() { s = (s*1664525 + 1013904223) % 4294967296; return s/4294967296; }
+}
+function shuffle(arr, r) {
+  for (let i=arr.length-1;i>0;i--){ const j = Math.floor(r()* (i+1)); [arr[i],arr[j]]=[arr[j],arr[i]] }
+  return arr
+}
+function sentenceCase(s){ if(!s) return ""; s = s.trim(); return s.charAt(0).toUpperCase()+s.slice(1) }
+
+// ---------- Generador de ítems (plantillas) ----------
+function generateExam(model){
+  const r = rng(model.seed || Date.now());
+  const topics = model.topics.split(',').map(t=>t.trim()).filter(Boolean);
+  const pickTopic = () => topics.length? topics[Math.floor(r()*topics.length)] : 'tema general';
+
+  // MCQ
+  const mcq = [];
+  for(let i=0;i<model.mcqCount;i++){
+    const tp = pickTopic();
+    const correct = sentenceCase(`Concepto clave de ${tp}`);
+    const options = new Set([correct]);
+    const distractorPool = [
+      `Definición parcial de ${tp}`,
+      `Dato no esencial de ${tp}`,
+      `Afirmación falsa sobre ${tp}`,
+      `Ejemplo relacionado a ${tp}`,
+      `Ninguna de las anteriores`
+    ];
+    shuffle(distractorPool, r);
+    for(const d of distractorPool){ if(options.size>=model.mcqOptions) break; options.add(sentenceCase(d)) }
+    const opts = Array.from(options);
+    const correctIndex = opts.indexOf(correct);
+    mcq.push({
+      stem: `Respecto de ${tp}, ¿cuál alternativa es la más correcta?`,
+      options: opts,
+      answer: correctIndex
+    });
+  }
+
+  // True/False
+  const tf = [];
+  for(let i=0;i<model.tfCount;i++){
+    const tp = pickTopic();
+    const val = r() > 0.5;
+    tf.push({
+      statement: sentenceCase(`${tp} siempre implica un único mecanismo.`),
+      answer: val
+    });
+  }
+
+  // Ensayo
+  const essay = [];
+  for(let i=0;i<model.essayCount;i++){
+    const tp = pickTopic();
+    essay.push({ prompt: `Desarrolle en profundidad: ${tp}. Incluya definición, fundamentos, ejemplos y aplicaciones.`});
+  }
+
+  return { mcq, tf, essay };
+}
+
+// ---------- Vista previa HTML ----------
+function renderPreview(meta, items){
+  const lines = [];
+  lines.push(`<div><b>${meta.institution||''}</b> · ${meta.course||''} · ${meta.subject||''}</div>`);
+  lines.push(`<h3 style="margin:.2rem 0 0">${meta.title||'Evaluación'}</h3>`);
+  lines.push(`<div class="muted" style="margin-bottom:8px">Docente: ${meta.teacher||''} · ${meta.date||''}</div>`);
+  if(meta.instructions){ lines.push(`<div class="pill" style="margin-bottom:8px">${meta.instructions}</div>`)}
+
+  if(items.mcq.length){
+    lines.push(`<h4>Sección A — Elección múltiple (${items.mcq.length})</h4>`);
+    items.mcq.forEach((q,idx)=>{
+      lines.push(`<div><b>${idx+1})</b> ${q.stem}</div>`);
+      const letters = 'ABCDE';
+      q.options.forEach((opt,i)=>{ lines.push(`<div style="margin-left:16px">${letters[i]}. ${opt}</div>`) })
+    })
+  }
+  if(items.tf.length){
+    lines.push(`<h4 style="margin-top:10px">Sección B — Verdadero/Falso (${items.tf.length})</h4>`);
+    items.tf.forEach((q,idx)=>{ lines.push(`<div><b>${idx+1})</b> ${q.statement} ( ) Verdadero · ( ) Falso</div>`) })
+  }
+  if(items.essay.length){
+    lines.push(`<h4 style="margin-top:10px">Sección C — Desarrollo (${items.essay.length})</h4>`);
+    items.essay.forEach((q,idx)=>{ lines.push(`<div><b>${idx+1})</b> ${q.prompt}</div><div style="height:80px;border-bottom:1px dashed rgba(148,163,184,.4);margin:6px 0"></div>`); })
+  }
+  return lines.join('');
+}
+
+// ---------- PDF (jspdf + autotable para márgenes/tablas) ----------
+function buildPDF(meta, items, isKey=false){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'mm', format:'a4' });
+  const margin = Number(document.getElementById('margins').value || 15);
+  const lineH = Number(document.getElementById('spacing').value || 1.4);
+  const pageW = doc.internal.pageSize.getWidth();
+
+  // Portada simple
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(16); doc.text(meta.institution||'', margin, 30);
+  doc.setFontSize(14); doc.text(`${meta.course||''} · ${meta.subject||''}`, margin, 40);
+  doc.setFontSize(22); doc.text(meta.title||'Evaluación', margin, 60);
+  doc.setFontSize(11); doc.setFont('helvetica','normal');
+  doc.text(`Docente: ${meta.teacher||''}`, margin, 72);
+  if(meta.date) doc.text(`Fecha: ${meta.date}`, margin, 80);
+  if(meta.instructions){ doc.setTextColor(80); doc.text(`Instrucciones: ${meta.instructions}`, margin, 92, {maxWidth: pageW - margin*2}); doc.setTextColor(0); }
+  doc.setDrawColor(120); doc.line(margin, 100, pageW - margin, 100);
+
+  doc.addPage();
+
+  // Contenido
+  let y = margin;
+  const write = (text, bold=false) => {
+    if(bold) doc.setFont('helvetica','bold'); else doc.setFont('helvetica','normal');
+    const lines = doc.splitTextToSize(text, pageW - margin*2);
+    lines.forEach(ln=>{ if(y>280){ doc.addPage(); y=margin } doc.text(ln, margin, y); y += 5*lineH; });
+  }
+
+  if(isKey){ write('SOLUCIONARIO', true); y+=2 }
+
+  if(items.mcq.length){
+    write(`Sección A — Elección múltiple (${items.mcq.length})`, true);
+    const letters='ABCDE';
+    items.mcq.forEach((q,i)=>{
+      write(`${i+1}) ${q.stem}`);
+      if(isKey){ write(`→ Correcta: ${letters[q.answer]}`) }
+      q.options.forEach((opt,idx)=>{ write(`   ${letters[idx]}. ${opt}`) })
+      y += 2
+    })
+  }
+  if(items.tf.length){
+    write(`Sección B — Verdadero/Falso (${items.tf.length})`, true);
+    items.tf.forEach((q,i)=>{ write(`${i+1}) ${q.statement}  ${isKey? '→ '+(q.answer?'Verdadero':'Falso') : '( ) V  ( ) F'}`) })
+  }
+  if(items.essay.length){
+    write(`Sección C — Desarrollo (${items.essay.length})`, true);
+    items.essay.forEach((q,i)=>{ write(`${i+1}) ${q.prompt}`); if(!isKey){ y+=20 } else { write('→ Criterios esperados: definición, argumentos, ejemplos, síntesis.') } })
+  }
+
+  return doc;
+}
+
+// ---------- DOCX (docx.js) ----------
+async function buildDOCX(meta, items, isKey=false){
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, PageOrientation } = window.docx;
+  const margin = Number(document.getElementById('margins').value || 15);
+  const doc = new Document({
+    sections: [{
+      properties: { page: { margin: { top: margin*56.7, bottom: margin*56.7, left: margin*56.7, right: margin*56.7 } } },
+      children: [
+        new Paragraph({ text: meta.institution||'', heading: HeadingLevel.HEADING_3 }),
+        new Paragraph({ text: `${meta.course||''} · ${meta.subject||''}` }),
+        new Paragraph({ text: meta.title||'Evaluación', heading: HeadingLevel.TITLE }),
+        new Paragraph({ text: `Docente: ${meta.teacher||''}   Fecha: ${meta.date||''}` }),
+        meta.instructions ? new Paragraph({ text: `Instrucciones: ${meta.instructions}` }) : new Paragraph({ text: '' }),
+        new Paragraph({ text: '' }),
+        ...(isKey ? [new Paragraph({ text: 'SOLUCIONARIO', heading: HeadingLevel.HEADING_1 })] : []),
+        ...(items.mcq.length ? [new Paragraph({ text: `Sección A — Elección múltiple (${items.mcq.length})`, heading: HeadingLevel.HEADING_2 })] : []),
+        ...items.mcq.flatMap((q,idx)=>{
+          const letters='ABCDE';
+          return [
+            new Paragraph({ text: `${idx+1}) ${q.stem}` }),
+            ...(isKey ? [new Paragraph({ text: `→ Correcta: ${letters[q.answer]}` })] : []),
+            ...q.options.map((opt,i)=> new Paragraph({ text: `   ${letters[i]}. ${opt}` })),
+          ]
+        }),
+        ...(items.tf.length ? [new Paragraph({ text: `Sección B — Verdadero/Falso (${items.tf.length})`, heading: HeadingLevel.HEADING_2 })] : []),
+        ...items.tf.map((q,idx)=> new Paragraph({ text: `${idx+1}) ${q.statement}  ${isKey? '→ '+(q.answer?'Verdadero':'Falso') : '( ) V  ( ) F'}` })),
+        ...(items.essay.length ? [new Paragraph({ text: `Sección C — Desarrollo (${items.essay.length})`, heading: HeadingLevel.HEADING_2 })] : []),
+        ...items.essay.map((q,idx)=> new Paragraph({ text: `${idx+1}) ${q.prompt}` })),
+      ]
+    }]
+  });
+  const blob = await Packer.toBlob(doc);
+  return blob;
+}
+
+// ---------- Estado / UI ----------
+let paid = false;
+const $ = sel => document.querySelector(sel);
+const metaFromForm = () => ({
+  institution: $('#institution').value.trim(),
+  course: $('#course').value.trim(),
+  subject: $('#subject').value.trim(),
+  teacher: $('#teacher').value.trim(),
+  date: $('#date').value,
+  title: $('#title').value.trim(),
+  instructions: $('#instructions').value.trim(),
+  topics: $('#topics').value.trim(),
+  mcqOptions: Number($('#mcqOptions').value),
+  mcqCount: Number($('#mcqCount').value||0),
+  tfCount: Number($('#tfCount').value||0),
+  essayCount: Number($('#essayCount').value||0),
+  seed: Number($('#seed').value||Date.now())
+});
+
+function enableDownloads(){
+  paid = true;
+  $('#payStatus').textContent = 'Estado: pagado ✓ (demo)';
+  $('#payStatus').style.color = '#22c55e';
+  ['#dlExamPDF','#dlKeyPDF','#dlExamDOCX','#dlKeyDOCX'].forEach(id=> $(id).classList.remove('hidden'));
+}
+
+$('#btnSimulatePay').addEventListener('click', ()=>{
+  // Simulación de pago
+  enableDownloads();
+});
+
+$('#btnPreview').addEventListener('click', ()=>{
+  const meta = metaFromForm();
+  const items = generateExam(meta);
+  $('#preview').innerHTML = renderPreview(meta, items);
+});
+
+$('#btnReset').addEventListener('click', ()=>{
+  document.getElementById('examForm').reset();
+  $('#preview').innerHTML='';
+  paid=false; $('#payStatus').textContent='Estado: no pagado'; $('#payStatus').style.color='';
+  ['#dlExamPDF','#dlKeyPDF','#dlExamDOCX','#dlKeyDOCX'].forEach(id=> $(id).classList.add('hidden'));
+});
+
+// Descargas
+$('#dlExamPDF').addEventListener('click', ()=>{
+  const meta = metaFromForm(); const items = generateExam(meta);
+  const doc = buildPDF(meta, items, false); doc.save(`${(meta.title||'Evaluacion').replace(/\s+/g,'_')}.pdf`);
+});
+$('#dlKeyPDF').addEventListener('click', ()=>{
+  const meta = metaFromForm(); const items = generateExam(meta);
+  const doc = buildPDF(meta, items, true); doc.save(`${(meta.title||'Evaluacion')}_SOLUCIONARIO.pdf`);
+});
+$('#dlExamDOCX').addEventListener('click', async()=>{
+  const meta = metaFromForm(); const items = generateExam(meta);
+  const blob = await buildDOCX(meta, items, false); saveAs(blob, `${(meta.title||'Evaluacion')}.docx`);
+});
+$('#dlKeyDOCX').addEventListener('click', async()=>{
+  const meta = metaFromForm(); const items = generateExam(meta);
+  const blob = await buildDOCX(meta, items, true); saveAs(blob, `${(meta.title||'Evaluacion')}_SOLUCIONARIO.docx`);
+});
+
+// Atajos
+window.addEventListener('keydown', (e)=>{
+  if(e.altKey && e.key.toLowerCase()==='g'){ e.preventDefault(); $('#btnPreview').click() }
+  if(e.altKey && e.key.toLowerCase()==='p'){ e.preventDefault(); $('#btnSimulatePay').click() }
+});
+</script>
+</body>
+</html>
